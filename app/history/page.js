@@ -1,60 +1,85 @@
-// app/history/page.js
-"use client"
-import { useEffect, useState } from "react";
-import Link from "next/link";
+"use client";
 
+import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [contents, setContents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch("/api/history", {
-          method: "GET",
-          credentials: "include",
-        })
-        const { data } = await res.json()
-        setHistory(data || [])
-      } catch (err) {
-        console.error("Error fetch history:", err)
-      } finally {
-        setLoading(false)
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
       }
+
+      let { data, error } = await supabase
+        .from("contents")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching history:", error);
+      } else {
+        setContents(data);
+      }
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [router]);
+
+  const handleCopy = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Copied to clipboard ✅");
+    } catch (err) {
+      console.error("Failed to copy: ", err);
     }
+  };
 
-    fetchHistory()
-  }, [])
-
-  if (loading) return <p>Loading...</p>
+  if (loading) return <p className="p-4">Loading...</p>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">History</h1>
-      {history.length === 0 ? (
-        <p>No content yet.</p>
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">📜 Your Content History</h1>
+
+      {contents.length === 0 ? (
+        <p className="text-gray-500">No history yet. Generate some content first!</p>
       ) : (
-        <ul className="space-y-4">
-          {history.map((item) => (
-            <li
+        <div className="space-y-6">
+          {contents.map((item) => (
+            <div
               key={item.id}
-              className="p-4 border rounded-lg bg-white shadow"
+              className="border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition"
             >
-              <h2 className="font-semibold">{item.niche}</h2>
-              <p className="text-gray-700">{item.description}</p>
-              <p className="text-gray-700">{item.description}</p>
-              <p className="text-gray-700">{item.ideas}</p>
-              <p className="text-xs text-gray-500">
-                {new Date(item.created_at).toLocaleString()}
+              <h2 className="text-lg font-semibold">{item.niche}</h2>
+              <p className="text-sm text-gray-600 mb-2">
+                {item.description || "No description"}
               </p>
-            </li>
+              <pre className="bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap">
+                {item.ideas}
+              </pre>
+              <div className="mt-3">
+                <button
+                  onClick={() => handleCopy(item.ideas)}
+                  className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Created: {new Date(item.created_at).toLocaleString()}
+              </p>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
-        <Link href="/" className="text-blue-600 underline">
-          Home
-        </Link>
     </div>
-  )
+  );
 }
