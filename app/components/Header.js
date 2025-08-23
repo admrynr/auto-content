@@ -1,26 +1,29 @@
 "use client";
-
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function Header() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/login"); // arahkan balik ke halaman login
+    router.push("/login");
   };
 
   return (
-    <header className="w-full p-4 flex justify-between items-center bg-white shadow">
-      <h1 className="text-xl font-bold text-indigo-600">Auto Content</h1>
-      <button
-        onClick={handleLogout}
-        className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
-      >
-        Logout
-      </button>
+    <header className="flex justify-between items-center p-4 shadow-md bg-white">
+      <h1 className="text-xl font-bold">Content Generator</h1>
+      <nav className="flex gap-4">
+        <Link href="/" className="hover:underline">Beranda</Link>
+        <Link href="/history" className="hover:underline">History</Link>
+        <button
+          onClick={handleLogout}
+          className="text-red-500 hover:underline"
+        >
+          Logout
+        </button>
+      </nav>
     </header>
   );
 }
