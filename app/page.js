@@ -15,6 +15,8 @@ export default function ProtectedPage() {
   const [ideas, setIdeas] = useState('');
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [imageUrl, setImageUrl] = useState('');
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,6 +32,9 @@ export default function ProtectedPage() {
 
       const data = await res.json();
       setIdeas(data.ideas);
+      if (data.image_url) {
+        setImageUrl(data.image_url); // tampilkan di UI
+      }
       console.log("Response dari server:", data);
     } catch (err) {
       console.error("Error submit:", err);
@@ -93,11 +98,36 @@ export default function ProtectedPage() {
           >
             Generate
           </button>
+
         </form>
+        {/*
+        <button
+            onClick={async () => {
+              const res = await fetch("/api/generate-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ niche, description }),
+              });
+              const data = await res.json();
+              if (data.image_url) {
+                setImageUrl(data.image_url); // tampilkan di UI
+              }
+            }}
+          >
+            Generate Image
+          </button>
+          */}
+
 
         {ideas && (
           <div className="mt-6 whitespace-pre-wrap bg-gray-100 p-4 rounded-xl">
             {ideas}
+          </div>
+        )}
+
+        {imageUrl && (
+          <div className="mt-4">
+            <img src={imageUrl} alt="Generated" className="rounded-xl shadow" />
           </div>
         )}
 

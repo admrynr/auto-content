@@ -28,6 +28,31 @@ export async function POST(req) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+  const imagePrompt = `Generate an image for niche: ${niche}. Additional details: ${description}`;
+
+  // 🔑 ambil API key Replicate dari env
+  const replicateKey = process.env.REPLICATE_API_KEY;
+
+  const res = await fetch("https://api.replicate.com/v1/models/ideogram-ai/ideogram-v3-turbo/predictions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${replicateKey}`,
+      "Content-Type": "application/json",
+      "Prefer": "wait"
+    },
+    body: JSON.stringify({
+      input: { 
+        "prompt" : imagePrompt,
+        "aspect_ratio": "1:1",
+    },
+    }),
+  });
+
+  const prediction = await res.json();
+
+  // ambil hasil image URL
+  const imageUrl = prediction?.output || res;
+
     // 2) Generate ide via OpenRouter (atau OpenAI)
     const prompt = `Generate 5 short content ideas (titles only) for "${niche}". Context: "${description}". Numbered list.`;
 
@@ -55,6 +80,7 @@ export async function POST(req) {
       niche,
       description,
       ideas,
+      image_url: imageUrl,
     });
 
     if (insertError) {
@@ -65,7 +91,7 @@ export async function POST(req) {
       );
     }
 
-    return NextResponse.json({ ideas });
+    return NextResponse.json({ ideas,image_url: imageUrl });
   } catch (err) {
     console.error("UNEXPECTED ERROR:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
