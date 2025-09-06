@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import Link from "next/link"
+import Link from "next/link";
+import { checkDailyLimit, logUsage } from "../lib/checkLimit";
 
 
 export default function ProtectedPage() {
@@ -21,6 +22,16 @@ export default function ProtectedPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const canGenerate = await checkDailyLimit(user.id, "text_and_image_generate");
+    if (!canGenerate) {
+      alert("Limit harian generate konten sudah tercapai!");
+      return;
+    }
+
+    console.log(user.id)
+
     console.log("Form submitted:", { niche, description });
 
     try {
@@ -31,6 +42,7 @@ export default function ProtectedPage() {
       });
 
       const data = await res.json();
+
       setIdeas(data.ideas);
       if (data.image_url) {
         setImageUrl(data.image_url); // tampilkan di UI
@@ -39,6 +51,15 @@ export default function ProtectedPage() {
     } catch (err) {
       console.error("Error submit:", err);
     }
+
+      // ... setelah proses generate sukses:
+      const resLog = await logUsage(user.id, "text_and_image_generate"); // atau "text_generate"
+      if (!resLog.ok) {
+        // bebas: pakai toast, alert, atau UI message
+        alert(`Gagal mencatat log: ${resLog.error.message}`);
+        // proses utama tetap lanjut — jangan diblokir
+      }
+
   };
 
   useEffect(() => {
