@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter()
   const supabase = createClientComponentClient()
 
@@ -14,12 +14,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  async function handleLogin(e) {
+  async function handleSignup(e) {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     })
@@ -27,8 +27,8 @@ export default function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      router.push("/")
-      router.refresh()
+      alert("Signup berhasil! Silakan cek email untuk verifikasi.")
+      router.push("/login")
     }
 
     setLoading(false)
@@ -37,9 +37,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white shadow-lg rounded-2xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
+        <h1 className="text-2xl font-bold mb-6 text-center">Sign Up</h1>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleSignup} className="space-y-4">
           <div>
             <label className="block text-sm mb-1">Email</label>
             <input
@@ -66,16 +66,16 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Signing up..." : "Sign Up"}
           </button>
         </form>
 
         <p className="mt-4 text-center text-sm">
-          Belum punya akun?{" "}
-          <Link href="/signup" className="text-blue-600 hover:underline">
-            Sign Up
+          Sudah punya akun?{" "}
+          <Link href="/login" className="text-blue-600 hover:underline">
+            Login
           </Link>
         </p>
       </div>
