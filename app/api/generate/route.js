@@ -54,7 +54,7 @@ export async function POST(req) {
   const imageUrl = prediction?.output || res;
 
     // 2) Generate ide via OpenRouter (atau OpenAI)
-    const prompt = `Generate 5 short content ideas (titles only) for "${niche}". Context: "${description}". Numbered list.`;
+    const prompt = `Buatkan saya konten pendek untuk caption instagram berbahasa Indonesia yang optimal untuk algoritma instagram, dengan niche : "${niche}". Konteks: "${description}". Lengkapi dengan hastag.`;
 
     const resp = await fetch(OPENROUTER_URL, {
       method: "POST",
@@ -91,7 +91,7 @@ export async function POST(req) {
       );
     }
 
-    return NextResponse.json({ ideas,image_url: imageUrl });
+    return NextResponse.json({ ideas,niche,image_url: imageUrl });
   } catch (err) {
     console.error("UNEXPECTED ERROR:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

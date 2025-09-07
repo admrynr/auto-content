@@ -6,21 +6,21 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Link from "next/link";
 import { checkDailyLimit, logUsage } from "../lib/checkLimit";
 
-
 export default function ProtectedPage() {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [checking, setChecking] = useState(true);
-  const [niche, setNiche] = useState("");
+  const [niche, setNiche] = useState("skincare");
   const [description, setDescription] = useState("");
   const [ideas, setIdeas] = useState('');
   const [history, setHistory] = useState([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingGenerate, setLoadingGenerate] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoadingGenerate(true)
 
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -47,9 +47,13 @@ export default function ProtectedPage() {
       if (data.image_url) {
         setImageUrl(data.image_url); // tampilkan di UI
       }
+      setNiche(data.niche);
       console.log("Response dari server:", data);
+
     } catch (err) {
       console.error("Error submit:", err);
+    } finally{
+      setLoadingGenerate(false);
     }
 
       // ... setelah proses generate sukses:
@@ -62,31 +66,33 @@ export default function ProtectedPage() {
 
   };
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch("/api/history", {
-          method: "GET",
-          credentials: "include",
-        })
-        const { data } = await res.json()
-        setHistory(data || [])
-      } catch (err) {
-        console.error("Error fetch history:", err)
-      } finally {
-        setLoadingHistory(false);
-      }
-    }
+          async function handleSave() {
+          // 🔹 ambil user login
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
+          if (!user) {
+            alert("Harus login dulu")
+            return
+          }
 
-    fetchHistory()
-  }, [])
+          // 🔹 simpan ke posts
+          const { error } = await supabase.from("posts").insert({
+            title: niche, // opsional bisa diubah jadi judul otomatis
+            content: ideas,
+            user_id: user.id,
+          })
+
+          if (error) {
+            console.error("Error saving draft:", error)
+          } else {
+            alert("Draft tersimpan!")
+          }
+        }
 
   return (
       <main className="max-w-xl mx-auto p-8">
         <h1 className="text-3xl font-bold mb-6">Auto Content Generator</h1>
-        <Link href="/history" className="text-blue-600 underline">
-          View History
-        </Link>
 
         <form onSubmit={handleSubmit} className="space-y-4 bg-white shadow p-6 rounded-xl">
           <div>
@@ -117,7 +123,7 @@ export default function ProtectedPage() {
             type="submit"
             className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 w-full"
           >
-            Generate
+            {loadingGenerate ? "Generating..." : "Generate"}
           </button>
 
         </form>
@@ -143,6 +149,12 @@ export default function ProtectedPage() {
         {ideas && (
           <div className="mt-6 whitespace-pre-wrap bg-gray-100 p-4 rounded-xl">
             {ideas}
+                      <button
+            onClick={handleSave}
+            className="bg-blue-600 text-white py-2 px-4 mt-2 rounded hover:bg-blue-700 w-full"
+          >
+            Save as Draft
+          </button>
           </div>
         )}
 
@@ -153,6 +165,7 @@ export default function ProtectedPage() {
         )}
 
       {/* history */}
+      {/*
       <div className="mt-8">
         <h2 className="text-2xl font-semibold mb-4">Your History</h2>
         {loadingHistory ? (
@@ -174,6 +187,8 @@ export default function ProtectedPage() {
           </ul>
         )}
       </div>
+      */}
+
       </main>
 
   );

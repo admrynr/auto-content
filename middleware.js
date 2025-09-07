@@ -13,7 +13,7 @@ export async function middleware(req) {
   const { pathname } = req.nextUrl
 
   // Halaman yang butuh login
-  const protectedPaths = ["/", "/history", "/profile"]
+  const protectedPaths = ["/", "/history", "/profile", "/drafts"]
 
   // Halaman login/signup (jangan diakses kalau sudah login)
   const authPaths = ["/login", "/signup"]
@@ -37,5 +37,5 @@ export async function middleware(req) {
 
 // hanya jalankan middleware di route tertentu
 export const config = {
-  matcher: ["/", "/history/:path*", "/profile", "/login", "/signup"],
+  matcher: ["/", "/history/:path*", "/profile", "/login", "/signup", "/drafts"],
 }

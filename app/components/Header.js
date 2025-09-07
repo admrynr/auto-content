@@ -62,7 +62,14 @@ export default function Header() {
               <History size={18} /> History
             </Link>
           )}
-        </nav>
+          {user && (
+            <Link
+              href="/drafts"
+              className="flex items-center gap-1 text-gray-700 hover:text-blue-600"
+            >
+              <History size={18} /> Drafts
+            </Link>
+          )}        </nav>
 
         {/* Auth Section (desktop) */}
         <div className="hidden md:flex items-center space-x-4">
@@ -131,6 +138,15 @@ export default function Header() {
                 className="flex items-center gap-2 text-gray-700 hover:text-blue-600"
               >
                 <History size={18} /> History
+              </Link>
+            )}
+            {user && (
+              <Link
+                href="/drafts"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 text-gray-700 hover:text-blue-600"
+              >
+                <History size={18} /> Drafts
               </Link>
             )}
 
