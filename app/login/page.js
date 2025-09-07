@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { toast } from "sonner"
+
 
 export default function LoginPage() {
   const router = useRouter()
@@ -19,10 +21,20 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    try{
+      const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
+      })
+      if(!error){
+        toast.success("Login berhasil", { duration: 1000 })
+      }else{
+        throw error
+      }
+    }catch (err){
+      toast.error(`Gagal login: ${err.message}`)
+    }
+
 
     if (error) {
       setError(error.message)

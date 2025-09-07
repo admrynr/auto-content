@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Link from "next/link";
 import { checkDailyLimit, logUsage } from "../lib/checkLimit";
+import { toast } from "sonner"
+
 
 export default function ProtectedPage() {
   const router = useRouter();
@@ -60,7 +62,7 @@ export default function ProtectedPage() {
       const resLog = await logUsage(user.id, "text_and_image_generate"); // atau "text_generate"
       if (!resLog.ok) {
         // bebas: pakai toast, alert, atau UI message
-        alert(`Gagal mencatat log: ${resLog.error.message}`);
+        toast.error(`Gagal mencatat log: ${resLog.error.message}`);
         // proses utama tetap lanjut — jangan diblokir
       }
 
@@ -72,7 +74,7 @@ export default function ProtectedPage() {
             data: { user },
           } = await supabase.auth.getUser()
           if (!user) {
-            alert("Harus login dulu")
+            toast.warning("Harus login dulu")
             return
           }
 
@@ -86,7 +88,7 @@ export default function ProtectedPage() {
           if (error) {
             console.error("Error saving draft:", error)
           } else {
-            alert("Draft tersimpan!")
+            toast.success("Draft tersimpan!")
           }
         }
 
