@@ -13,49 +13,47 @@ export default function ProtectedPage() {
   const supabase = createClientComponentClient();
   const [checking, setChecking] = useState(true);
   const [niche, setNiche] = useState("skincare");
-  const [description, setDescription] = useState("");
-  const [ideas, setIdeas] = useState('');
-  const [history, setHistory] = useState([]);
-  const [loadingGenerate, setLoadingGenerate] = useState(false);
-  const [imageUrl, setImageUrl] = useState('');
+  const [prompt, setPrompt] = useState("");
+  const [content, setContent] = useState("");
+  const [title, setTitle] = useState("");
+  const [loadingText, setLoadingText] = useState(false);
+  const [loadingImage, setLoadingImage] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
 
 
-  const handleSubmit = async (e) => {
+  const handleGenerateText = async (e) => {
     e.preventDefault();
-    setLoadingGenerate(true)
+    setLoadingText(true)
 
     const { data: { user } } = await supabase.auth.getUser();
 
     const canGenerate = await checkDailyLimit(user.id, "text_and_image_generate");
     if (!canGenerate) {
-      alert("Limit harian generate konten sudah tercapai!");
+      toast.warning("Limit harian generate konten sudah tercapai!");
       return;
     }
 
     console.log(user.id)
 
-    console.log("Form submitted:", { niche, description });
+    console.log("Form submitted:", { title, content });
 
     try {
-      const res = await fetch("/api/generate", {
+      setLoadingText(true)
+      setContent("")
+      setTitle("")
+
+      const res = await fetch("/api/generate-text", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ niche, description }),
-      });
-
-      const data = await res.json();
-
-      setIdeas(data.ideas);
-      if (data.image_url) {
-        setImageUrl(data.image_url); // tampilkan di UI
-      }
-      setNiche(data.niche);
-      console.log("Response dari server:", data);
-
+        body: JSON.stringify({ prompt }),
+      })
+      const data = await res.json()
+      setContent(data.content)
+      setTitle(data.title)
+      toast.success("Success Generate Text")
     } catch (err) {
-      console.error("Error submit:", err);
-    } finally{
-      setLoadingGenerate(false);
+      toast.error("Error generating text:", err)
+    } finally {
+      setLoadingText(false)
     }
 
       // ... setelah proses generate sukses:
@@ -68,130 +66,115 @@ export default function ProtectedPage() {
 
   };
 
-          async function handleSave() {
-          // 🔹 ambil user login
-          const {
-            data: { user },
-          } = await supabase.auth.getUser()
-          if (!user) {
-            toast.warning("Harus login dulu")
-            return
-          }
+  const handleGenerateImage = async () => {
+    try {
+      setLoadingImage(true)
+      setImageUrl("")
 
-          // 🔹 simpan ke posts
-          const { error } = await supabase.from("posts").insert({
-            title: niche, // opsional bisa diubah jadi judul otomatis
-            content: ideas,
-            user_id: user.id,
-          })
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
+      })
+      const data = await res.json()
+      setImageUrl(data.imageUrl)
+      toast.success("Success Generate Image")
+    } catch (err) {
+      toast.error("Error generating image:", err)
+    } finally {
+      setLoadingImage(false)
+    }
+  }
 
-          if (error) {
-            console.error("Error saving draft:", error)
-          } else {
-            toast.success("Draft tersimpan!")
-          }
-        }
+    // Save draft (simpan ke Supabase)
+  const handleSave = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase.from("posts").insert({
+        user_id: user.id,
+        prompt,
+        title,
+        content,
+        image_url: imageUrl || null,
+        status: "draft",
+      })
+
+      toast.success("Draft berhasil disimpan!")
+    } catch (err) {
+      toast.error("Error saving draft:", err)
+    }
+  }
 
   return (
-      <main className="max-w-xl mx-auto p-8">
-        <h1 className="text-3xl font-bold mb-6">Auto Content Generator</h1>
+    <main className="max-w-2xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Generate Konten</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4 bg-white shadow p-6 rounded-xl">
-          <div>
-            <label className="block font-medium">Select niche:</label>
-            <select
-              className="w-full border p-2 rounded"
-              value={niche}
-              onChange={e => setNiche(e.target.value)}
-            >
-              <option value="skincare">Skincare</option>
-              <option value="gadgets">Gadgets</option>
-              <option value="fitness">Fitness</option>
-            </select>
-          </div>
+      {/* Input prompt */}
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Tulis ide atau tema konten..."
+        className="w-full p-2 border rounded mb-4"
+      />
 
-          <div>
-            <label className="block font-medium">Optional description:</label>
-            <input
-              type="text"
-              className="w-full border p-2 rounded"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="e.g. budget-friendly for gen z"
-            />
-          </div>
+      {/* Tombol generate teks */}
+      <button
+        onClick={handleGenerateText}
+        disabled={loadingText || !prompt}
+        className="bg-blue-600 text-white px-4 py-2 rounded mr-2"
+      >
+        {loadingText ? "Loading..." : "Generate Teks"}
+      </button>
 
-          <button
-            type="submit"
-            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 w-full"
-          >
-            {loadingGenerate ? "Generating..." : "Generate"}
-          </button>
-
-        </form>
-        {/*
+      {/* Generate image hanya aktif kalau ada teks */}
+      {content && (
         <button
-            onClick={async () => {
-              const res = await fetch("/api/generate-image", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ niche, description }),
-              });
-              const data = await res.json();
-              if (data.image_url) {
-                setImageUrl(data.image_url); // tampilkan di UI
-              }
-            }}
-          >
-            Generate Image
-          </button>
-          */}
+          onClick={handleGenerateImage}
+          disabled={loadingImage}
+          className="bg-green-600 text-white px-4 py-2 rounded"
+        >
+          {loadingImage ? "Loading..." : "Generate Image"}
+        </button>
+      )}
 
+      {/* Hasil judul */}
+      {title && (
+        <div className="mt-6">
+          <h2 className="font-semibold mb-2">Judul:</h2>
+          <p className="p-2 border rounded bg-gray-50">{title}</p>
+        </div>
+      )}
 
-        {ideas && (
-          <div className="mt-6 whitespace-pre-wrap bg-gray-100 p-4 rounded-xl">
-            {ideas}
-                      <button
-            onClick={handleSave}
-            className="bg-blue-600 text-white py-2 px-4 mt-2 rounded hover:bg-blue-700 w-full"
-          >
-            Save as Draft
-          </button>
-          </div>
-        )}
+      {/* Hasil konten */}
+      {content && (
+        <div className="mt-6">
+          <h2 className="font-semibold mb-2">Hasil Teks:</h2>
+          <p className="p-2 border rounded bg-gray-50 whitespace-pre-line">
+            {content}
+          </p>
+        </div>
+      )}
 
-        {imageUrl && (
-          <div className="mt-4">
-            <img src={imageUrl} alt="Generated" className="rounded-xl shadow" />
-          </div>
-        )}
+      {/* Hasil image */}
+      {imageUrl && (
+        <div className="mt-6">
+          <h2 className="font-semibold mb-2">Hasil Gambar:</h2>
+          <img src={imageUrl} alt="Generated" className="rounded-lg shadow" />
+        </div>
+      )}
 
-      {/* history */}
-      {/*
-      <div className="mt-8">
-        <h2 className="text-2xl font-semibold mb-4">Your History</h2>
-        {loadingHistory ? (
-          <p>Loading history...</p>
-        ) : history.length === 0 ? (
-          <p>No history yet</p>
-        ) : (
-          <ul className="space-y-3">
-            {history.map((item) => (
-              <li key={item.id} className="border p-3 rounded bg-gray-50">
-                <p className="font-bold">Niche: {item.niche}</p>
-                <p className="italic">Desc: {item.description}</p>
-                <p className="mt-2">{item.ideas}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date(item.created_at).toLocaleString()}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      */}
-
-      </main>
-
-  );
+      {/* Save draft */}
+      {(title || content || imageUrl) && (
+        <button
+          onClick={handleSave}
+          className="mt-6 bg-purple-600 text-white px-4 py-2 rounded"
+        >
+          Save as Draft
+        </button>
+      )}
+    </main>
+  )
 }

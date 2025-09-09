@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Router, useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const supabase = createClientComponentClient();
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
@@ -76,6 +78,16 @@ export default function ProfilePage() {
     }
   }
 
+  const handleConnectInstagram = () => {
+    const clientId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    const redirectUri = encodeURIComponent(
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`
+    );
+    const scope = "instagram_basic,pages_show_list,instagram_content_publish";
+    const authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+    router.push(authUrl);
+  };
+
   if (!session) {
     return <p className="text-center mt-10">Please login to view your profile.</p>;
   }
@@ -119,11 +131,19 @@ export default function ProfilePage() {
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           {loading ? "Saving..." : "Save"}
         </button>
       </form>
+      <div className="flex justify-center p-2">
+        <button
+          onClick={handleConnectInstagram}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700"
+        >
+          Connect Instagram
+        </button>
+      </div>
     </div>
   );
 }

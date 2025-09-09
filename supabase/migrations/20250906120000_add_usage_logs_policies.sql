@@ -1,47 +1,43 @@
--- Migration: Add usage_logs policies
+-- 🔹 1. Hapus tabel contents kalau sudah tidak dipakai
+drop table if exists contents;
 
--- Pastikan tabel sudah ada
-create table if not exists usage_logs (
+-- 🔹 2. Tambah kolom prompt di tabel posts (kalau belum ada)
+alter table posts
+add column if not exists prompt text;
+
+-- 🔹 3. Tambah kolom image_url di tabel posts (kalau belum ada)
+alter table posts
+add column if not exists image_url text;
+
+-- 🔹 4. Tambah kolom updated_at dengan auto update trigger
+alter table posts
+add column if not exists updated_at timestamptz default now();
+
+-- Trigger function untuk auto update updated_at
+create or replace function handle_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+-- Buat trigger di tabel posts
+drop trigger if exists set_updated_at on posts;
+create trigger set_updated_at
+before update on posts
+for each row
+execute function handle_updated_at();
+
+-- 🔹 5. Pastikan kolom status tetap ada (draft/published)
+alter table posts
+add column if not exists status text default 'draft';
+
+-- 🔹 6. History table (pastikan sesuai desain)
+create table if not exists history (
   id uuid default uuid_generate_v4() primary key,
-  user_id uuid references auth.users(id) not null,
-  action text not null,
+  post_id uuid references posts(id) on delete cascade,
+  status text check (status in ('success', 'failed')),
+  message text,
   created_at timestamptz default now()
 );
-
--- Aktifkan RLS
-alter table usage_logs enable row level security;
-
--- Bersihkan policy lama agar tidak bentrok
-drop policy if exists "Users can insert their own logs" on usage_logs;
-drop policy if exists "Users can read their own logs" on usage_logs;
-drop policy if exists "Users can delete their own logs" on usage_logs;
-drop policy if exists "Users can update their own logs" on usage_logs;
-
--- INSERT
-create policy "Users can insert their own logs"
-on usage_logs
-for insert
-to authenticated
-with check (user_id = auth.uid());
-
--- SELECT
-create policy "Users can read their own logs"
-on usage_logs
-for select
-to authenticated
-using (user_id = auth.uid());
-
--- DELETE (opsional)
-create policy "Users can delete their own logs"
-on usage_logs
-for delete
-to authenticated
-using (user_id = auth.uid());
-
--- UPDATE (opsional)
-create policy "Users can update their own logs"
-on usage_logs
-for update
-to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
