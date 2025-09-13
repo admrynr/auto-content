@@ -14,6 +14,9 @@ export default function ProfilePage() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [accounts, setAccounts] = useState([]);
+  const [loadingAccount, setLoadingAccount] = useState(true);
+  const [activeId, setActiveId] = useState(null);
 
   // Get session user
   useEffect(() => {
@@ -30,6 +33,25 @@ export default function ProfilePage() {
   useEffect(() => {
     if (session?.user) getProfile();
   }, [session]);
+
+  useEffect(() => {
+    async function loadAccounts() {
+      const res = await fetch("/api/social/list");
+      const data = await res.json();
+      setAccounts(data.accounts || []);
+      setActiveId(data.activeId || null);
+      setLoadingAccount(false);
+    }
+    loadAccounts();
+  }, []);
+
+  async function setActive(accountId) {
+    await fetch("/api/social/set-active", {
+      method: "POST",
+      body: JSON.stringify({ account_id: accountId }),
+    });
+    setActiveId(accountId);
+  }
 
   async function getProfile() {
     try {
@@ -93,56 +115,80 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">My Profile</h1>
-      <form onSubmit={updateProfile} className="space-y-4">
-        <div>
-          <label className="block text-sm">Full Name</label>
-          <input
-            className="w-full p-2 border rounded"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
+    <div>
+      <div className="max-w-lg mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-4">My Profile</h1>
+        <form onSubmit={updateProfile} className="space-y-4">
+          <div>
+            <label className="block text-sm">Full Name</label>
+            <input
+              className="w-full p-2 border rounded"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm">Username</label>
+            <input
+              className="w-full p-2 border rounded"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm">Bio</label>
+            <textarea
+              className="w-full p-2 border rounded"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm">Avatar URL</label>
+            <input
+              className="w-full p-2 border rounded"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            {loading ? "Saving..." : "Save"}
+          </button>
+        </form>
+        <div className="flex justify-center p-2">
+          <button
+            onClick={handleConnectInstagram}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700"
+          >
+            Connect Instagram
+          </button>
         </div>
-        <div>
-          <label className="block text-sm">Username</label>
-          <input
-            className="w-full p-2 border rounded"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm">Bio</label>
-          <textarea
-            className="w-full p-2 border rounded"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm">Avatar URL</label>
-          <input
-            className="w-full p-2 border rounded"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          {loading ? "Saving..." : "Save"}
-        </button>
-      </form>
-      <div className="flex justify-center p-2">
-        <button
-          onClick={handleConnectInstagram}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700"
-        >
-          Connect Instagram
-        </button>
+      </div>
+
+      <div className="max-w-lg mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-4">Instagram Accounts</h1>
+        {loadingAccount ? "Loading..." : ""}
+        {accounts.map((acc) => (
+          <div
+            key={acc.account_id}
+            className={`p-4 rounded-lg border ${
+              acc.account_id === activeId ? "border-blue-500 bg-blue-50" : "border-gray-200"
+            }`}
+          >
+            <p className="font-medium">{acc.page_name}</p>
+            <p className="text-sm text-gray-500">IG ID: {acc.account_id}</p>
+            <button
+              onClick={() => setActive(acc.account_id)}
+              className="mt-2 px-3 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-700"
+            >
+              {acc.account_id === activeId ? "Active" : "Set Active"}
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
