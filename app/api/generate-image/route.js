@@ -26,14 +26,14 @@ export async function POST(req) {
     // 🔑 Replicate API key
     const replicateKey = process.env.REPLICATE_API_KEY;
 
-    const res = await fetch(
+    // --- Step 1: Create prediction ---
+    let res = await fetch(
       "https://api.replicate.com/v1/models/ideogram-ai/ideogram-v3-turbo/predictions",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${replicateKey}`,
           "Content-Type": "application/json",
-          Prefer: "wait",
         },
         body: JSON.stringify({
           input: {
@@ -44,14 +44,37 @@ export async function POST(req) {
       }
     );
 
-    const prediction = await res.json();
-    const imageUrl = prediction?.output?.[0] || null;
+    let prediction = await res.json();
+    if (prediction.error) throw new Error(prediction.error);
 
-    console.log(prediction);
+    // --- Step 2: Polling (kalau status masih jalan) ---
+    while (
+      prediction.status !== "succeeded" &&
+      prediction.status !== "failed" &&
+      !prediction.output
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // tunggu 2 detik
+      const pollRes = await fetch(
+        `https://api.replicate.com/v1/predictions/${prediction.id}`,
+        { headers: { Authorization: `Bearer ${replicateKey}` } }
+      );
+      prediction = await pollRes.json();
+    }
 
+    // --- Step 3: Handle result (array/string) ---
+    let imageUrl = null;
+    if (prediction.output) {
+      imageUrl = Array.isArray(prediction.output)
+        ? prediction.output[0]
+        : prediction.output;
+    }
+
+    if (!imageUrl) throw new Error("Image generation failed: no output URL");
+
+    console.log("✅ Replicate done:", imageUrl);
     return NextResponse.json({ imageUrl });
   } catch (err) {
     console.error("UNEXPECTED ERROR (image):", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
