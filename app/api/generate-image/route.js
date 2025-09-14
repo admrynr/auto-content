@@ -47,6 +47,8 @@ export async function POST(req) {
     const prediction = await res.json();
     const imageUrl = prediction?.output?.[0] || null;
 
+    console.log(prediction);
+
     return NextResponse.json({ imageUrl });
   } catch (err) {
     console.error("UNEXPECTED ERROR (image):", err);
