@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Router, useRouter } from "next/navigation";
+import { toast } from "sonner"
+
 
 export default function ProfilePage() {
   const supabase = createClientComponentClient();
@@ -17,6 +19,10 @@ export default function ProfilePage() {
   const [accounts, setAccounts] = useState([]);
   const [loadingAccount, setLoadingAccount] = useState(true);
   const [activeId, setActiveId] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+
+
 
   // Get session user
   useEffect(() => {
@@ -34,6 +40,7 @@ export default function ProfilePage() {
     if (session?.user) getProfile();
   }, [session]);
 
+
   useEffect(() => {
     async function loadAccounts() {
       const res = await fetch("/api/social/list");
@@ -46,11 +53,26 @@ export default function ProfilePage() {
   }, []);
 
   async function setActive(accountId) {
-    await fetch("/api/social/set-active", {
-      method: "POST",
-      body: JSON.stringify({ account_id: accountId }),
-    });
-    setActiveId(accountId);
+    setSaving(true);
+    try {
+      const res =     await fetch("/api/social/set-active", {
+        method: "POST",
+        body: JSON.stringify({ account_id: accountId }),
+      });
+
+      const data = await res.json();
+      if(data.success){
+        setActiveId(accountId);
+        toast.success("Instagram account selected!")
+      } else{
+        toast.error("Failed to set active:", data.error);
+      }
+    } catch(err) {
+      toast.error("Request error:", err);
+    } finally {
+      setSaving(false);
+    }
+
   }
 
   async function getProfile() {
@@ -172,23 +194,46 @@ export default function ProfilePage() {
       <div className="max-w-lg mx-auto p-6">
         <h1 className="text-2xl font-bold mb-4">Instagram Accounts</h1>
         {loadingAccount ? "Loading..." : ""}
-        {accounts.map((acc) => (
-          <div
-            key={acc.account_id}
-            className={`p-4 rounded-lg border ${
-              acc.account_id === activeId ? "border-blue-500 bg-blue-50" : "border-gray-200"
-            }`}
-          >
-            <p className="font-medium">{acc.page_name}</p>
-            <p className="text-sm text-gray-500">IG ID: {acc.account_id}</p>
-            <button
-              onClick={() => setActive(acc.account_id)}
-              className="mt-2 px-3 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-700"
+        <ul className="space-y-3">
+          {accounts.map((acc) => (
+            <li
+              key={acc.id}
+              className={`flex items-center gap-3 p-3 rounded border ${
+                acc.is_active ? "border-green-500" : "border-gray-300"
+              }`}
             >
-              {acc.account_id === activeId ? "Active" : "Set Active"}
-            </button>
-          </div>
-        ))}
+              {acc.profile_picture_url ? (
+                <img
+                  src={acc.profile_picture_url}
+                  alt={acc.username || acc.account_id}
+                  className="w-10 h-10 rounded-full"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-200" />
+              )}
+
+              <div>
+                <p className="font-semibold">@{acc.username || acc.account_id}</p>
+                <p className="text-sm text-gray-600">{acc.name || "Tanpa nama"}</p>
+              </div>
+
+              {activeId === acc.account_id ? (
+                <span className="ml-auto text-green-600 font-bold text-sm">
+                  Aktif
+                </span>
+              ) : (
+                <button
+                  onClick={() => setActive(acc.account_id)}
+                  disabled={saving}
+                  className="ml-auto px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {saving ? "..." : "Set Active"}
+                </button>
+              )
+              }
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
