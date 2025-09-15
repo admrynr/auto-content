@@ -127,7 +127,7 @@ export default function ProfilePage() {
     const redirectUri = encodeURIComponent(
       `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/instagram/callback`
     );
-    const scope = "instagram_basic,pages_show_list,instagram_content_publish";
+    const scope = "instagram_basic,pages_show_list,instagram_content_publish,instagram_basic,pages_show_list,pages_read_engagement,pages_manage_posts,business_management";
     const authUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     router.push(authUrl);
   };
