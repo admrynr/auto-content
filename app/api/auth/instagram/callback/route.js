@@ -21,7 +21,10 @@ export async function GET(req) {
 
     const accessToken = tokenData.access_token;
     if (!accessToken) {
-      return NextResponse.json({ error: "Failed to get token", details: tokenData }, { status: 400 });
+      return NextResponse.json(
+        { error: "Failed to get token", details: tokenData },
+        { status: 400 }
+      );
     }
 
     // 2. Ambil semua Pages user
@@ -56,17 +59,15 @@ export async function GET(req) {
 
       if (igDetailData?.error) continue;
 
-      if (igData.instagram_business_account?.id) {
-        igAccounts.push({
-          page_id: page.id,
-          page_name: page.name,
-          ig_id: igData.instagram_business_account.id,
-          access_token: page.access_token, // lebih baik simpan page access token
-          username: igDetailData.username,
-          name: igDetailData.name,
-          profile_picture_url: igDetailData.profile_picture_url,
-        });
-      }
+      igAccounts.push({
+        page_id: page.id,
+        page_name: page.name,
+        ig_id: igUserId,
+        access_token: page.access_token, // ⚡ pakai page access token
+        username: igDetailData.username,
+        name: igDetailData.name,
+        profile_picture_url: igDetailData.profile_picture_url,
+      });
     }
 
     if (!igAccounts.length) {
@@ -84,8 +85,8 @@ export async function GET(req) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Insert multiple IG accounts
-    const { error: insertError } = await supabase.from("social_accounts").insert(
+    // Upsert multiple IG accounts (hindari duplicate key error)
+    const { error: upsertError } = await supabase.from("social_accounts").upsert(
       igAccounts.map((acc) => ({
         user_id: user.id,
         provider: "instagram",
@@ -95,14 +96,18 @@ export async function GET(req) {
         page_name: acc.page_name,
         username: acc.username,
         name: acc.name,
-        profile_picture_url: acc.profile_picture_url
-      }))
+        profile_picture_url: acc.profile_picture_url,
+        updated_at: new Date().toISOString(), // 🔄 trigger jg update, tapi kita set manual juga
+      })),
+      {
+        onConflict: "account_id,provider,user_id", // sesuai unique constraint
+      }
     );
 
-    if (insertError) {
-      console.error("❌ Supabase Insert Error:", insertError);
+    if (upsertError) {
+      console.error("❌ Supabase Upsert Error:", upsertError);
     } else {
-      console.log("✅ Saved IG accounts for user:", user.id);
+      console.log("✅ Upserted IG accounts for user:", user.id);
     }
 
     // 5. Redirect ke profile → nanti user pilih mau pakai akun yang mana

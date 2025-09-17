@@ -85,28 +85,38 @@ export default function ProtectedPage() {
     }
   }
 
-    // Save draft (simpan ke Supabase)
+  // Save draft (simpan ke Supabase via API route)
   const handleSave = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
+      const res = await fetch("/api/post/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt,
+          title,
+          content,
+          imageUrl, // kirim hasil generate image (nanti disimpan ke storage di server)
+        }),
+      });
 
-      await supabase.from("posts").insert({
-        user_id: user.id,
-        prompt,
-        title,
-        content,
-        image_url: imageUrl || null,
-        status: "draft",
-      })
+      const data = await res.json();
 
-      toast.success("Draft berhasil disimpan!")
+      if (!res.ok) {
+        toast.error(`Error saving draft: ${data.error}`);
+        return;
+      }
+
+      toast.success("✅ Draft berhasil disimpan!");
+      console.log("Saved draft:", data);
     } catch (err) {
-      toast.error("Error saving draft:", err)
+      console.error("❌ Error saving draft:", err);
+      toast.error("Error saving draft");
     }
-  }
+  };
+
+
 
   return (
     <main className="max-w-2xl mx-auto p-4">
