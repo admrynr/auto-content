@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Link from "next/link";
 import { checkDailyLimit, logUsage } from "../lib/checkLimit";
-import { toast } from "sonner"
-
+import { toast } from "sonner";
 
 export default function ProtectedPage() {
   const router = useRouter();
@@ -18,14 +17,16 @@ export default function ProtectedPage() {
   const [title, setTitle] = useState("");
   const [loadingText, setLoadingText] = useState(false);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [loadingSave, setLoadingSave] = useState(false); // ✅ loader untuk save
   const [imageUrl, setImageUrl] = useState("");
-
 
   const handleGenerateText = async (e) => {
     e.preventDefault();
-    setLoadingText(true)
+    setLoadingText(true);
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const canGenerate = await checkDailyLimit(user.id, "text_and_image_generate");
     if (!canGenerate) {
@@ -33,61 +34,54 @@ export default function ProtectedPage() {
       return;
     }
 
-    console.log(user.id)
-
-    console.log("Form submitted:", { title, content });
-
     try {
-      setLoadingText(true)
-      setContent("")
-      setTitle("")
+      setContent("");
+      setTitle("");
 
       const res = await fetch("/api/generate-text", {
         method: "POST",
         body: JSON.stringify({ prompt }),
-      })
-      const data = await res.json()
-      setContent(data.content)
-      setTitle(data.title)
-      toast.success("Success Generate Text")
+      });
+      const data = await res.json();
+      setContent(data.content);
+      setTitle(data.title);
+      toast.success("Success Generate Text");
     } catch (err) {
-      toast.error("Error generating text:", err)
+      toast.error("Error generating text:", err);
     } finally {
-      setLoadingText(false)
+      setLoadingText(false);
     }
 
-      // ... setelah proses generate sukses:
-      const resLog = await logUsage(user.id, "text_and_image_generate"); // atau "text_generate"
-      if (!resLog.ok) {
-        // bebas: pakai toast, alert, atau UI message
-        toast.error(`Gagal mencatat log: ${resLog.error.message}`);
-        // proses utama tetap lanjut — jangan diblokir
-      }
-
+    // log usage
+    const resLog = await logUsage(user.id, "text_and_image_generate");
+    if (!resLog.ok) {
+      toast.error(`Gagal mencatat log: ${resLog.error.message}`);
+    }
   };
 
   const handleGenerateImage = async () => {
     try {
-      setLoadingImage(true)
-      setImageUrl("")
+      setLoadingImage(true);
+      setImageUrl("");
 
       const res = await fetch("/api/generate-image", {
         method: "POST",
         body: JSON.stringify({ prompt }),
-      })
-      const data = await res.json()
-      setImageUrl(data.imageUrl)
-      toast.success("Success Generate Image")
+      });
+      const data = await res.json();
+      setImageUrl(data.imageUrl);
+      toast.success("Success Generate Image");
     } catch (err) {
-      toast.error("Error generating image:", err)
+      toast.error("Error generating image:", err);
     } finally {
-      setLoadingImage(false)
+      setLoadingImage(false);
     }
-  }
+  };
 
-  // Save draft (simpan ke Supabase via API route)
+  // Save draft
   const handleSave = async () => {
     try {
+      setLoadingSave(true); // ✅ mulai loading
       const res = await fetch("/api/post/save", {
         method: "POST",
         headers: {
@@ -97,7 +91,7 @@ export default function ProtectedPage() {
           prompt,
           title,
           content,
-          imageUrl, // kirim hasil generate image (nanti disimpan ke storage di server)
+          imageUrl,
         }),
       });
 
@@ -113,16 +107,15 @@ export default function ProtectedPage() {
     } catch (err) {
       console.error("❌ Error saving draft:", err);
       toast.error("Error saving draft");
+    } finally {
+      setLoadingSave(false); // ✅ stop loading
     }
   };
-
-
 
   return (
     <main className="max-w-2xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Generate Konten</h1>
 
-      {/* Input prompt */}
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -130,27 +123,24 @@ export default function ProtectedPage() {
         className="w-full p-2 border rounded mb-4"
       />
 
-      {/* Tombol generate teks */}
       <button
         onClick={handleGenerateText}
         disabled={loadingText || !prompt}
         className="bg-blue-600 text-white px-4 py-2 rounded mr-2"
       >
-        {loadingText ? "Loading..." : "Generate Teks"}
+        {loadingText ? "⏳ Loading..." : "Generate Teks"}
       </button>
 
-      {/* Generate image hanya aktif kalau ada teks */}
       {content && (
         <button
           onClick={handleGenerateImage}
           disabled={loadingImage}
           className="bg-green-600 text-white px-4 py-2 rounded"
         >
-          {loadingImage ? "Loading..." : "Generate Image"}
+          {loadingImage ? "⏳ Loading..." : "Generate Image"}
         </button>
       )}
 
-      {/* Hasil judul */}
       {title && (
         <div className="mt-6">
           <h2 className="font-semibold mb-2">Judul:</h2>
@@ -158,7 +148,6 @@ export default function ProtectedPage() {
         </div>
       )}
 
-      {/* Hasil konten */}
       {content && (
         <div className="mt-6">
           <h2 className="font-semibold mb-2">Hasil Teks:</h2>
@@ -168,7 +157,6 @@ export default function ProtectedPage() {
         </div>
       )}
 
-      {/* Hasil image */}
       {imageUrl && (
         <div className="mt-6">
           <h2 className="font-semibold mb-2">Hasil Gambar:</h2>
@@ -176,15 +164,15 @@ export default function ProtectedPage() {
         </div>
       )}
 
-      {/* Save draft */}
       {(title || content || imageUrl) && (
         <button
           onClick={handleSave}
+          disabled={loadingSave}
           className="mt-6 bg-purple-600 text-white px-4 py-2 rounded"
         >
-          Save as Draft
+          {loadingSave ? "💾 Saving..." : "Save as Draft"}
         </button>
       )}
     </main>
-  )
+  );
 }
