@@ -9,7 +9,9 @@ export default function DraftsPage() {
   const [drafts, setDrafts] = useState([])
   const [loading, setLoading] = useState(true)
   const [publishing, setPublishing] = useState(false) // 🔹 loader publish state
-const [publishingDraftId, setPublishingDraftId] = useState(null)
+  const [publishingDraftId, setPublishingDraftId] = useState(null)
+  const [updatingDraftId, setUpdatingDraftId] = useState(null)
+
 
   useEffect(() => {
     fetchDrafts()
@@ -27,101 +29,150 @@ const [publishingDraftId, setPublishingDraftId] = useState(null)
     setLoading(false)
   }
 
-  async function handlePublish(draft) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  // client handleUpdate (snippet to use inside your component)
+  async function handleUpdate(id, newContent) {
+    // optimistic: simpan lama dulu
+    const currentDraft = drafts.find(d => d.id === id);
+    if (!currentDraft) {
+      toast.error("Draft tidak ditemukan");
+      return;
+    }
+    if ((currentDraft.content || "").trim() === (newContent || "").trim()) return;
 
-    setPublishing(true)
-    setPublishingDraftId(draft.id)
+    const prevContent = currentDraft.content;
+    setDrafts(prev => prev.map(d => d.id === id ? { ...d, content: newContent, updated_at: new Date().toISOString() } : d));
+    setUpdatingDraftId(id);
 
     try {
-      // --- Step 1: Ambil akun Instagram aktif ---
-      const { data: activeAccount, error: accountErr } = await supabase
-        .from("social_accounts")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .single();
-
-      if (accountErr || !activeAccount) throw new Error("No active Instagram account");
-
-      const igUserId = activeAccount.account_id;
-      const accessToken = activeAccount.access_token;
-
-      // --- Step 2: Create media container ---
-      const containerRes = await fetch(
-        `https://graph.facebook.com/v17.0/${igUserId}/media`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image_url: draft.image_url || "https://media.istockphoto.com/id/1055079680/vector/black-linear-photo-camera-like-no-image-available.jpg",
-            caption: draft.content,
-            access_token: accessToken,
-          }),
-        }
-      );
-      const containerData = await containerRes.json();
-      if (containerData.error) throw new Error(containerData.error.message);
-      const creationId = containerData.id;
-
-      // --- Step 3: Publish media ---
-      const publishRes = await fetch(
-        `https://graph.facebook.com/v17.0/${igUserId}/media_publish`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            creation_id: creationId,
-            access_token: accessToken,
-          }),
-        }
-      );
-      const publishData = await publishRes.json();
-      if (publishData.error) throw new Error(publishData.error.message);
-
-      // --- Step 4: Update post status ---
-      const { error: updateError } = await supabase
-        .from("posts")
-        .update({ status: "published" })
-        .eq("id", draft.id);
-      if (updateError) throw updateError;
-
-      // --- Step 5: Insert ke history ---
-      const { error: historyError } = await supabase.from("history").insert({
-        user_id: user.id,
-        post_id: draft.id,
-        status: "success",
-        message:
-          draft.status === "published"
-            ? `Republished to Instagram (Post ID: ${publishData.id})`
-            : `Published to Instagram (Post ID: ${publishData.id})`,
+      const res = await fetch("/api/post/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, content: newContent }),
       });
-      if (historyError) throw historyError;
 
-      toast.success(
-        draft.status === "published"
-          ? "Draft berhasil direpublish ke Instagram!"
-          : "Draft berhasil dipublish ke Instagram!"
-      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "Gagal update");
+      }
 
-      fetchDrafts(); // refresh data
+      // if server returned updated post, sync it (so updated_at, etc. are accurate)
+      if (data.post) {
+        setDrafts(prev => prev.map(d => (d.id === id ? data.post : d)));
+      }
+
+      toast.success("Draft berhasil diperbarui.");
     } catch (err) {
-      console.error("Publish error:", err);
+      console.error("Update error:", err);
+      setDrafts(prev => prev.map(d => (d.id === id ? { ...d, content: prevContent } : d)));
+      toast.error(`Gagal memperbarui draft: ${err.message ?? err}`);
+    } finally {
+      setUpdatingDraftId(null);
+    }
+  }
 
-      await supabase.from("history").insert({
-        user_id: user?.id ?? null,
-        post_id: draft.id,
-        status: "failed",
-        message: err.message,
+  async function handleDelete(id) {
+    try {
+      const res = await fetch("/api/post/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
       });
 
-      toast.error(`Gagal publish: ${err.message}`);
-    } finally {
-      setPublishing(false)
-      setPublishingDraftId(null)
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal menghapus");
+
+      toast.success("Draft berhasil dihapus", {duration:1000});
+      fetchDrafts(); // refresh list
+    } catch (err) {
+      console.error(err);
+      toast.error(`Gagal menghapus: ${err.message}`);
     }
+  }
+
+  // di dalam DraftsPage component (client)
+  async function handlePublish(draft) {
+    setPublishing(true);
+    setPublishingDraftId(draft.id);
+
+    try {
+      // optional: quick client-side check user logged in (nicer UX)
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData?.user) {
+        toast.error("Kamu belum login.");
+        return;
+      }
+
+      const res = await fetch("/api/post/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: draft.id }),
+      });
+
+      // if not ok, try read raw text for debugging
+      if (!res.ok) {
+        const raw = await res.text();
+        console.error("Publish endpoint returned not-ok raw response:", raw);
+        // parse json if possible
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed?.error) {
+            toast.error(`Gagal publish: ${parsed.error}${parsed.detail ? " — " + JSON.stringify(parsed.detail) : ""}`);
+          } else {
+            toast.error(`Gagal publish: Server responded ${res.status}`);
+          }
+        } catch {
+          toast.error(`Gagal publish: Server responded ${res.status}`);
+        }
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data?.error) {
+        toast.error(`Gagal publish: ${data.error}${data.detail ? " — " + JSON.stringify(data.detail) : ""}`);
+      } else {
+        // success: update local state to match
+        setDrafts((prev) =>
+          prev.map((d) => (d.id === draft.id ? { ...d, status: data.post?.status ?? "published" } : d))
+        );
+        toast.success("Draft berhasil dipublish ke Instagram!", { duration: 1000 });
+      }
+    } catch (err) {
+      console.error("handlePublish error:", err);
+      toast.error(`Gagal publish: ${err?.message ?? String(err)}`);
+    } finally {
+      setPublishing(false);
+      setPublishingDraftId(null);
+      await fetchDrafts();
+    }
+  }
+
+  function confirmDeleteDraft(draftId) {
+    toast(
+      (t) => (
+        <div className="flex flex-col space-y-3">
+          <p className="text-sm">Yakin ingin menghapus draft ini?</p>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => {
+                handleDelete(draftId);
+                toast.dismiss(t);
+              }}
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm"
+            >
+              Hapus
+            </button>
+            <button
+              onClick={() => toast.dismiss(t)}
+              className="px-3 py-1 bg-gray-300 text-gray-800 rounded text-sm"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      ),
+      { duration: Infinity }
+    );
   }
 
   return (
@@ -191,7 +242,7 @@ const [publishingDraftId, setPublishingDraftId] = useState(null)
                     : "Publish"}
                 </button>
                 <button
-                  onClick={() => handleDelete(draft.id)}
+                  onClick={() => confirmDeleteDraft(draft.id)}
                   className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
                 >
                   Delete

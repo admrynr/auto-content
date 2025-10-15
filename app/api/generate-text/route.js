@@ -39,7 +39,7 @@ export async function POST(req) {
         messages: [
           {
             role: "user",
-            content: `Buatkan konten Instagram panjang, informatif, menarik, SEO friendly dan relevan  dengan prompt: "${prompt}". Lengkapi dengan hashtag populer.`,
+            content: `Buatkan konten Instagram panjang, informatif, menarik, SEO friendly dan relevan  dengan prompt: "${prompt}". Lengkapi dengan hashtag populer. Tetap pertimbangkan batasan maksimal karakter untuk caption instagram.`,
           },
         ],
       }),
