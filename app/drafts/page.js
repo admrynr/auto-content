@@ -147,6 +147,36 @@ export default function DraftsPage() {
     }
   }
 
+  async function handleGenerateVideo(draft) {
+    try {
+      toast.loading("⏳ Generating video... please wait");
+
+      const res = await fetch("/api/post/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: draft.image_url,
+          postId: draft.id,
+          duration: 5,
+        }),
+      });
+
+      const data = await res.json();
+      toast.dismiss();
+
+      if (!res.ok) throw new Error(data.error || "Video generation failed");
+
+      toast.success("✅ Video berhasil dibuat dan disimpan!");
+
+      // Refresh list
+      fetchDrafts();
+    } catch (err) {
+      toast.dismiss();
+      toast.error(`Gagal generate video: ${err.message}`);
+    }
+  }
+
+
   function confirmDeleteDraft(draftId) {
     toast(
       (t) => (
@@ -192,15 +222,28 @@ export default function DraftsPage() {
             className="border rounded-lg p-4 shadow-sm flex flex-col relative"
           >
             <div className="border rounded-lg mb-4">
-              <img
-                src={
-                  draft.image_url ||
-                  "https://media.istockphoto.com/id/1055079680/vector/black-linear-photo-camera-like-no-image-available.jpg"
-                }
-                width={500}
-                height={500}
-                alt="Generated draft"
-              />
+              { draft.video_url ?
+                (
+                  <video controls preload="none"
+                  src={draft.video_url}
+                  autoPlay
+                  loop
+                  className="shadow-md w-full max-w-lg mx-auto">
+                    Your browser does not support the video tag.
+                  </video>
+                ) :
+                (
+                  <img
+                    src={
+                      draft.image_url ||
+                      "https://media.istockphoto.com/id/1055079680/vector/black-linear-photo-camera-like-no-image-available.jpg"
+                    }
+                    width={500}
+                    height={500}
+                    alt="Generated draft"
+                  /> 
+                )  
+              }
             </div>
 
             <textarea
@@ -247,6 +290,13 @@ export default function DraftsPage() {
                 >
                   Delete
                 </button>
+                <button
+                  onClick={() => handleGenerateVideo(draft)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Generate Video
+                </button>
+
               </div>
             </div>
           </div>
